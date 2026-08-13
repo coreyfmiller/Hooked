@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hooked</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a2e; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; margin: 0 auto; cursor: crosshair; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #ui button, #ui #shop-panel, #ui #boat-switcher, #ui #catch-panel { pointer-events: auto; }
+        #status { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); 
+                   color: white; font-size: 16px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+                   background: rgba(0,0,0,0.6); padding: 8px 16px; border-radius: 8px; }
+        #stats { position: absolute; bottom: 20px; left: 20px; color: white; font-size: 14px;
+                 text-shadow: 1px 1px 2px rgba(0,0,0,0.8); background: rgba(0,0,0,0.6);
+                 padding: 10px 14px; border-radius: 8px; line-height: 1.8; }
+        #catch-panel { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                       background: rgba(20, 40, 60, 0.95); border: 2px solid #4aa;
+                       border-radius: 12px; padding: 24px; text-align: center; color: white;
+                       display: none; min-width: 280px; }
+        #catch-panel h2 { color: #ffd700; margin-bottom: 10px; font-size: 22px; }
+        #catch-panel p { margin: 6px 0; font-size: 16px; }
+        #catch-panel .buttons { margin-top: 16px; display: flex; gap: 12px; justify-content: center; }
+        #catch-panel button { padding: 10px 24px; font-size: 16px; border: none; border-radius: 6px;
+                              cursor: pointer; font-weight: bold; }
+        #keep-btn { background: #2d8a4e; color: white; }
+        #keep-btn:hover { background: #3da85e; }
+        #sell-btn { background: #c49a20; color: white; }
+        #sell-btn:hover { background: #d4aa30; }
+        #tension-bar { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+                       width: 300px; height: 20px; background: rgba(0,0,0,0.6); border-radius: 10px;
+                       overflow: hidden; display: none; border: 1px solid #666; }
+        #tension-fill { height: 100%; width: 0%; background: #4a4;
+                        transition: width 0.1s, background-color 0.3s; border-radius: 10px; }
+        #progress-bar { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
+                        width: 300px; height: 14px; background: rgba(0,0,0,0.6); border-radius: 7px;
+                        overflow: hidden; display: none; border: 1px solid #666; }
+        #progress-fill { height: 100%; width: 0%; background: linear-gradient(to right, #48f, #4cf);
+                         transition: width 0.1s; border-radius: 7px; }
+        #shop-panel { position: absolute; top: 50%; right: 20px; transform: translateY(-50%);
+                      background: rgba(15, 30, 45, 0.95); border: 2px solid #4aa;
+                      border-radius: 12px; padding: 16px; color: white; display: none;
+                      width: 280px; max-height: 80vh; overflow-y: auto; }
+        #shop-panel h2 { color: #ffd700; margin-bottom: 8px; text-align: center; font-size: 18px; }
+        #shop-panel h3 { margin: 0; font-size: 14px; }
+        #dock-prompt { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%);
+                       display: none; text-align: center; pointer-events: none; }
+        #dock-prompt button { pointer-events: auto; padding: 12px 32px; font-size: 18px; font-weight: bold;
+                              border: 2px solid #d4a76a; border-radius: 10px; cursor: pointer;
+                              background: linear-gradient(to bottom, #8B5E3C, #6B3E1C);
+                              color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+                              box-shadow: 0 4px 8px rgba(0,0,0,0.4); transition: all 0.2s; }
+        #dock-prompt button:hover { background: linear-gradient(to bottom, #A07040, #8B5E3C);
+                                     transform: scale(1.05); }
+        #dock-prompt .dock-subtitle { color: #ccc; font-size: 12px; margin-top: 4px; }
+        #boat-switcher { position: absolute; bottom: 20px; right: 20px; 
+                         background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 8px;
+                         color: white; font-size: 13px; }
+        #boat-switcher button { padding: 4px 10px; margin: 2px; font-size: 12px; border: 1px solid #666;
+                                border-radius: 4px; cursor: pointer; background: #333; color: #ccc; }
+        #boat-switcher button.active { background: #2d8a4e; border-color: #4cf; color: white; }
+        #boat-switcher button:disabled { opacity: 0.4; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <canvas id="game"></canvas>
+    <div id="ui">
+        <div id="status">Loading...</div>
+        <div id="stats">
+            <div>🕐 <span id="game-clock">8:00 AM</span></div>
+            <div>🪙 Gold: <span id="gold">0</span></div>
+            <div>⭐ Level: <span id="level">1</span> | XP: <span id="xp">0</span>/<span id="xp-need">100</span></div>
+            <div>🐟 Fish Caught: <span id="fish-count">0</span></div>
+            <div>🎣 Rod: <span id="rod-name">Bamboo Rod</span></div>
+            <div>📦 Hold: <span id="cargo">0/5</span></div>
+        </div>
+        <div id="tension-bar"><div id="tension-fill"></div></div>
+        <div id="progress-bar"><div id="progress-fill"></div></div>
+        <div id="catch-panel">
+            <h2>🎣 FISH CAUGHT!</h2>
+            <img id="catch-img" src="" style="max-width:180px; max-height:100px; margin:8px auto; display:block;" />
+            <p id="catch-name">---</p>
+            <p id="catch-weight">Weight: ---</p>
+            <p id="catch-length">Length: ---</p>
+            <p id="catch-xp" style="color: #4cf;">+0 XP</p>
+            <p id="catch-value" style="color: #ffd700;">Value: 0 gold</p>
+            <div class="buttons">
+                <button id="keep-btn" onclick="keepFish()">KEEP</button>
+                <button id="sell-btn" onclick="sellFish()">SELL</button>
+            </div>
+        </div>
+        <div id="shop-panel">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0;">🏪 SHOP</h2>
+                <button onclick="toggleShop()" style="background:#a33; color:white; border:none; border-radius:50%; width:28px; height:28px; font-size:16px; cursor:pointer; font-weight:bold;">✕</button>
+            </div>
+            <div id="shop-items"></div>
+        </div>
+        <div id="dock-prompt">
+            <button onclick="toggleShop()">⚓ DOCK</button>
+            <div class="dock-subtitle">Sell Fish & Buy Gear</div>
+        </div>
+        <div id="journal-btn" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); pointer-events:auto;">
+            <button onclick="toggleJournal()" style="padding:8px 16px; background:rgba(0,0,0,0.6); color:#ffd700; border:1px solid #ffd700; border-radius:6px; cursor:pointer; font-size:14px;">📖 Journal</button>
+        </div>
+        <div id="journal-panel" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+             background:rgba(15,30,45,0.95); border:2px solid #ffd700; border-radius:12px; padding:20px;
+             color:white; display:none; width:400px; max-height:70vh; overflow-y:auto; pointer-events:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h2 style="color:#ffd700; margin:0;">📖 Fish Journal</h2>
+                <button onclick="toggleJournal()" style="background:#a33; color:white; border:none; border-radius:50%; width:28px; height:28px; font-size:16px; cursor:pointer;">✕</button>
+            </div>
+            <div id="journal-content"></div>
+        </div>
+        <div id="anim-toggles" style="position:absolute; top:20px; left:0; background:rgba(0,0,0,0.6);
+             padding:8px 12px; border-radius:0 8px 8px 0; color:white; font-size:12px; pointer-events:auto;">
+            <div onclick="document.getElementById('toggle-content').style.display = document.getElementById('toggle-content').style.display === 'none' ? 'block' : 'none'" 
+                 style="cursor:pointer; font-weight:bold; margin-bottom:4px; user-select:none;">⚙️ Toggles ▾</div>
+            <div id="toggle-content">
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-depth" checked onchange="animToggles.depth=this.checked"> Depth Breathing
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-shoreline" checked onchange="animToggles.shoreline=this.checked"> Shoreline Shimmer
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-bubbles" checked onchange="animToggles.bubbles=this.checked"> Boat Bubbles
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-mist" checked onchange="animToggles.mist=this.checked"> Waterfall Mist
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-castSplash" checked onchange="animToggles.castSplash=this.checked"> Cast Splash
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-hookFlash" checked onchange="animToggles.hookFlash=this.checked"> Hook Animation
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-clouds" checked onchange="animToggles.clouds=this.checked"> Cloud Shadows
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-fishJump" checked onchange="animToggles.fishJump=this.checked"> Fish Jumping
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-fishShadow" checked onchange="animToggles.fishShadow=this.checked"> Fish Shadow
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-timeOfDay" checked onchange="animToggles.timeOfDay=this.checked"> Time of Day
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-forceNight" onchange="toggleForceNight(this.checked)"> Force Night
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-fastCycle" onchange="toggleFastCycle(this.checked)"> Fast Cycle (15s)
+            </label>
+            <label style="display:block; margin:3px 0; cursor:pointer;">
+                <input type="checkbox" id="toggle-grid" onchange="animToggles.grid=this.checked"> Grid Overlay
+            </label>
+            <div style="margin-top:8px; border-top:1px solid #444; padding-top:6px;">
+                <div style="font-weight:bold; margin-bottom:4px;">🚤 Boat</div>
+                <label style="display:block; margin:3px 0; cursor:pointer;">
+                    <input type="radio" name="boat-select" value="rowboat" checked onchange="selectBoat('rowboat')"> Wooden Rowboat
+                </label>
+                <label style="display:block; margin:3px 0; cursor:pointer;">
+                    <input type="radio" name="boat-select" value="aluminum" onchange="selectBoat('aluminum')"> Aluminum Boat
+                </label>
+                <label style="display:block; margin:3px 0; cursor:pointer;">
+                    <input type="radio" name="boat-select" value="bass_boat" onchange="selectBoat('bass_boat')"> Bass Boat
+                </label>
+            </div>
+            </div>
+        </div>
+        <span id="current-boat-name" style="display:none;">Wooden Rowboat</span>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>

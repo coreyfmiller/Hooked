@@ -1,0 +1,13 @@
+{
+  "name": "hooked-party",
+  "version": "1.0.0",
+  "description": "Multiplayer server for Hooked fishing game",
+  "main": "server.ts",
+  "scripts": {
+    "dev": "partykit dev",
+    "deploy": "partykit deploy"
+  },
+  "dependencies": {
+    "partykit": "^0.0.108"
+  }
+}
