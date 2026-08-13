@@ -326,6 +326,7 @@ const audio = {
     boat: new Audio('audio/freesound_community-boat-on-river-26388.mp3'),
     crow: new Audio('audio/kave_msri-crow-sfx-318131.mp3'),
     owl: new Audio('audio/lazychillzone-owl-hooting-223549.mp3'),
+    waterfall: new Audio('audio/freesound_community-waterfall-24060.mp3'),
     bite: new Audio('audio/47313572-notification-alert-269289.mp3'),
     loon: new Audio('audio/dragon-studio-loon-call-335487.mp3'),
     shopOpen: new Audio('audio/open store.mp3'),
@@ -349,6 +350,8 @@ audio.snap.volume = 0.5;
 audio.coin.volume = 0.4;
 audio.crow.volume = 0.3;
 audio.owl.volume = 0.3;
+audio.waterfall.loop = true;
+audio.waterfall.volume = 0;
 audio.bite.volume = 0.5;
 audio.loon.volume = 0.3;
 audio.shopOpen.volume = 0.4;
@@ -366,6 +369,7 @@ function startAudio() {
     audio.ambient.play().catch(() => {});
     audio.nightAmbient.play().catch(() => {});
     audio.boat.play().catch(() => {});
+    audio.waterfall.play().catch(() => {});
 }
 
 function playSound(sound) {
@@ -381,7 +385,14 @@ function updateAudio() {
     // Crossfade day/night ambient based on time
     if (isNight()) {
         audio.ambient.volume = Math.max(0, audio.ambient.volume - 0.003);
-        audio.nightAmbient.volume = Math.min(0.3, audio.nightAmbient.volume + 0.003);
+        // Frogs louder near lily pad area
+        const lilyX = canvas.width * (460 / 2322);
+        const lilyY = canvas.height * (844 / 1155);
+        const lilyDx = boat.x - lilyX;
+        const lilyDy = boat.y - lilyY;
+        const lilyDist = Math.sqrt(lilyDx * lilyDx + lilyDy * lilyDy);
+        const nightTargetVol = lilyDist < 300 ? 0.3 + 0.25 * (1 - lilyDist / 300) : 0.3;
+        audio.nightAmbient.volume += (nightTargetVol - audio.nightAmbient.volume) * 0.01;
     } else {
         audio.ambient.volume = Math.min(0.3, audio.ambient.volume + 0.003);
         audio.nightAmbient.volume = Math.max(0, audio.nightAmbient.volume - 0.003);
@@ -390,6 +401,22 @@ function updateAudio() {
     // Boat sound — volume based on speed
     const speedRatio = Math.abs(boat.speed) / equippedBoat.maxSpeed;
     audio.boat.volume = Math.min(0.25, speedRatio * 0.3);
+    
+    // Waterfall — distance-based volume
+    const waterfallX = canvas.width * 0.2705;
+    const waterfallY = canvas.height * 0.0900;
+    const wfDx = boat.x - waterfallX;
+    const wfDy = boat.y - waterfallY;
+    const wfDist = Math.sqrt(wfDx * wfDx + wfDy * wfDy);
+    const wfMaxDist = 400;
+    const wfMinDist = 80;
+    if (wfDist <= wfMinDist) {
+        audio.waterfall.volume = 0.7;
+    } else if (wfDist >= wfMaxDist) {
+        audio.waterfall.volume = 0;
+    } else {
+        audio.waterfall.volume = 0.7 * (1 - (wfDist - wfMinDist) / (wfMaxDist - wfMinDist));
+    }
     
     // Reel sound — play during fight when holding mouse
     if (gameState === State.FIGHTING && mouse.down) {
@@ -405,11 +432,18 @@ function updateAudio() {
         }
     }
     
-    // Random crow call (every few minutes during day)
-    if (!isNight() && Math.random() < 0.0003) {
-        if (!audio.crow._lastPlayed || Date.now() - audio.crow._lastPlayed > 120000) {
-            audio.crow._lastPlayed = Date.now();
-            playSound(audio.crow);
+    // Crow call — proximity to top-right island where birds circle, every few minutes
+    if (!isNight()) {
+        const crowX = canvas.width * 0.72;
+        const crowY = canvas.height * 0.28;
+        const crowDx = boat.x - crowX;
+        const crowDy = boat.y - crowY;
+        const crowDist = Math.sqrt(crowDx * crowDx + crowDy * crowDy);
+        if (crowDist < 350 && Math.random() < 0.002) {
+            if (!audio.crow._lastPlayed || Date.now() - audio.crow._lastPlayed > 120000) {
+                audio.crow._lastPlayed = Date.now();
+                playSound(audio.crow);
+            }
         }
     }
     
@@ -881,6 +915,7 @@ function checkLoaded() {
         initBirds();
         initClouds();
         initFireflies();
+        initLilyPads();
         gameState = State.DRIVING;
         setStatus('WASD to drive. Click water to cast. B for shop. Dock to access shop.');
     }
@@ -910,9 +945,11 @@ function isWater(worldX, worldY) {
     const r = collisionData.data[idx];
     const g = collisionData.data[idx + 1];
     const b = collisionData.data[idx + 2];
-    // Green (G>200, B<50) = land — everything else is navigable
+    // Green (G>200, B<50) = land — not navigable
     if (g > 200 && b < 50) return false;
-    return true; // Blue zones (any shade) or red dock = water/navigable
+    // Red (R>180, G<100, B<100) = dock — not navigable
+    if (r > 180 && g < 100 && b < 100) return false;
+    return true; // Blue zones (any shade) = water/navigable
 }
 
 // ============================================
@@ -1716,14 +1753,16 @@ cloudImgs[1].src = 'cloud2.png';
 cloudImgs[2].src = 'cloud3.png';
 
 function initClouds() {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
         cloudShadows.push({
-            x: -300 + Math.random() * (canvas.width + 300),
-            y: -canvas.height * 0.4 + Math.random() * canvas.height * 1.3,
+            x: -300 - (i * 400) - Math.random() * 300, // Stagger start positions off-screen
+            y: -canvas.height * 0.2 + Math.random() * canvas.height * 1.1,
             scale: 0.3 + Math.random() * 0.3,
             speed: 0.15 + Math.random() * 0.15,
-            alpha: 0.3,
+            alpha: 0.2 + Math.random() * 0.15,
             imgIndex: Math.floor(Math.random() * 3),
+            flipX: Math.random() < 0.5,
+            rotation: (Math.random() - 0.5) * 0.3,
             active: true,
             cooldown: 0
         });
@@ -1738,7 +1777,7 @@ function updateClouds() {
             if (c.cooldown <= 0) {
                 c.active = true;
                 c.x = -300;
-                c.y = -canvas.height * 0.4 + Math.random() * canvas.height * 1.3;
+                c.y = -canvas.height * 0.2 + Math.random() * canvas.height * 1.1;
                 c.scale = 0.3 + Math.random() * 0.3;
                 c.imgIndex = Math.floor(Math.random() * 3);
             }
@@ -1747,9 +1786,12 @@ function updateClouds() {
         c.x += c.speed;
         if (c.x > canvas.width + 300) {
             c.x = -300;
-            c.y = -canvas.height * 0.4 + Math.random() * canvas.height * 1.3;
+            c.y = -canvas.height * 0.2 + Math.random() * canvas.height * 1.1;
             c.scale = 0.3 + Math.random() * 0.3;
             c.imgIndex = Math.floor(Math.random() * 3);
+            c.flipX = Math.random() < 0.5;
+            c.rotation = (Math.random() - 0.5) * 0.3;
+            c.alpha = 0.2 + Math.random() * 0.15;
         }
     }
 }
@@ -1760,11 +1802,94 @@ function renderClouds() {
         if (!c.active) continue;
         const img = cloudImgs[c.imgIndex];
         if (!img.complete || img.naturalWidth === 0) continue;
-        ctx.save();
-        ctx.globalAlpha = c.alpha;
         const w = img.naturalWidth * c.scale;
         const h = img.naturalHeight * c.scale;
-        ctx.drawImage(img, c.x, c.y, w, h);
+        ctx.save();
+        ctx.globalAlpha = c.alpha;
+        ctx.translate(c.x + w / 2, c.y + h / 2);
+        ctx.rotate(c.rotation);
+        if (c.flipX) ctx.scale(-1, 1);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        ctx.restore();
+    }
+}
+
+// ============================================
+// LILY PADS
+// ============================================
+let lilyPads = [];
+const lilyPadImgs = [new Image(), new Image()];
+lilyPadImgs[0].src = 'lillypad1.png';
+lilyPadImgs[1].src = 'lillypad2.png';
+
+function initLilyPads() {
+    const centerX = canvas.width * (460 / 2322);
+    const centerY = canvas.height * (844 / 1155);
+    
+    // Main cluster
+    for (let i = 0; i < 14; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 5 + Math.random() * 45;
+        lilyPads.push({
+            x: centerX + Math.cos(angle) * dist,
+            y: centerY + Math.sin(angle) * dist,
+            size: 6 + Math.random() * 5,
+            rotation: Math.random() * Math.PI * 2,
+            bobPhase: Math.random() * Math.PI * 2,
+            bobSpeed: 0.8 + Math.random() * 0.6,
+            hasFlower: Math.random() < 0.3,
+            imgIndex: Math.floor(Math.random() * 2)
+        });
+    }
+    
+    // Cluster to the right
+    const rightX = canvas.width * (580 / 2322);
+    const rightY = canvas.height * (874 / 1155);
+    for (let i = 0; i < 11; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 5 + Math.random() * 35;
+        lilyPads.push({
+            x: rightX + Math.cos(angle) * dist,
+            y: rightY + Math.sin(angle) * dist,
+            size: 5 + Math.random() * 5,
+            rotation: Math.random() * Math.PI * 2,
+            bobPhase: Math.random() * Math.PI * 2,
+            bobSpeed: 0.8 + Math.random() * 0.6,
+            hasFlower: Math.random() < 0.25,
+            imgIndex: Math.floor(Math.random() * 2)
+        });
+    }
+    
+    // Cluster below
+    const belowX = canvas.width * (490 / 2322);
+    const belowY = canvas.height * (924 / 1155);
+    for (let i = 0; i < 9; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 5 + Math.random() * 30;
+        lilyPads.push({
+            x: belowX + Math.cos(angle) * dist,
+            y: belowY + Math.sin(angle) * dist,
+            size: 5 + Math.random() * 4,
+            rotation: Math.random() * Math.PI * 2,
+            bobPhase: Math.random() * Math.PI * 2,
+            bobSpeed: 0.8 + Math.random() * 0.6,
+            hasFlower: Math.random() < 0.2,
+            imgIndex: Math.floor(Math.random() * 2)
+        });
+    }
+}
+
+function renderLilyPads() {
+    for (const pad of lilyPads) {
+        const bob = Math.sin(waterTime * pad.bobSpeed + pad.bobPhase) * 1.2;
+        const img = lilyPadImgs[pad.imgIndex];
+        if (!img.complete || img.naturalWidth === 0) continue;
+        
+        ctx.save();
+        ctx.translate(pad.x, pad.y + bob);
+        ctx.rotate(pad.rotation);
+        const drawSize = pad.size * 2.5;
+        ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
         ctx.restore();
     }
 }
@@ -2635,6 +2760,9 @@ function render() {
     
     // Draw mist
     renderMist();
+    
+    // Draw lily pads
+    renderLilyPads();
     
     // Draw cloud shadows
     
