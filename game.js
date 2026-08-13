@@ -300,9 +300,9 @@ function renderTimeTint() {
             ctx.fillRect(bobber.x - 20, bobber.y - 20, 40, 40);
         }
         
-        // Dock lantern glow
-        const dockX = canvas.width * 0.807;
-        const dockY = canvas.height * 0.994;
+        // Dock lantern glow (ratio-based)
+        const dockX = canvas.width * 0.534;
+        const dockY = canvas.height * 0.743;
         const dockGlow = ctx.createRadialGradient(dockX, dockY, 0, dockX, dockY, 80);
         dockGlow.addColorStop(0, 'rgba(255, 180, 80, 0.25)');
         dockGlow.addColorStop(0.5, 'rgba(255, 150, 50, 0.1)');
@@ -1382,13 +1382,13 @@ let mistParticles = [];
 
 function updateMist() {
     if (!animToggles.mist) return;
-    // Spawn area — waterfall (fixed positions)
-    const spawnX = 624;
-    const spawnY = 113;
+    // Spawn area — waterfall (ratio-based, calculated from 2322x1155 reference)
+    const spawnX = canvas.width * 0.2705;
+    const spawnY = canvas.height * 0.0900;
     
-    // Second spawn point
-    const spawnX2 = 615;
-    const spawnY2 = 116;
+    // Second spawn point (slightly left and lower)
+    const spawnX2 = canvas.width * 0.2665;
+    const spawnY2 = canvas.height * 0.0930;
     
     // Spawn a few particles per frame from each point
     if (Math.random() < 0.4) {
@@ -1716,14 +1716,16 @@ cloudImgs[1].src = 'cloud2.png';
 cloudImgs[2].src = 'cloud3.png';
 
 function initClouds() {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
         cloudShadows.push({
-            x: -300 + Math.random() * (canvas.width + 300),
+            x: canvas.width + Math.random() * 500, // Start off-screen
             y: Math.random() * canvas.height * 0.7,
             scale: 0.3 + Math.random() * 0.3,
             speed: 0.15 + Math.random() * 0.15,
             alpha: 0.3,
-            imgIndex: Math.floor(Math.random() * 3)
+            imgIndex: Math.floor(Math.random() * 3),
+            active: false,
+            cooldown: Math.random() * 600 // Random delay before first appearance
         });
     }
 }
@@ -1731,12 +1733,21 @@ function initClouds() {
 function updateClouds() {
     if (!animToggles.clouds) return;
     for (const c of cloudShadows) {
+        if (!c.active) {
+            c.cooldown -= 1/60;
+            if (c.cooldown <= 0) {
+                c.active = true;
+                c.x = -300;
+                c.y = Math.random() * canvas.height * 0.7;
+                c.scale = 0.3 + Math.random() * 0.3;
+                c.imgIndex = Math.floor(Math.random() * 3);
+            }
+            continue;
+        }
         c.x += c.speed;
         if (c.x > canvas.width + 300) {
-            c.x = -300;
-            c.y = Math.random() * canvas.height * 0.7;
-            c.scale = 0.3 + Math.random() * 0.3;
-            c.imgIndex = Math.floor(Math.random() * 3);
+            c.active = false;
+            c.cooldown = 120 + Math.random() * 300; // 2-7 minutes before next pass
         }
     }
 }
@@ -1744,6 +1755,7 @@ function updateClouds() {
 function renderClouds() {
     if (!animToggles.clouds) return;
     for (const c of cloudShadows) {
+        if (!c.active) continue;
         const img = cloudImgs[c.imgIndex];
         if (!img.complete || img.naturalWidth === 0) continue;
         ctx.save();
@@ -2720,6 +2732,7 @@ function render() {
         ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
         ctx.font = '12px monospace';
         ctx.fillText(`${mouse.x}, ${mouse.y}`, mouse.x + 10, mouse.y - 10);
+        ctx.fillText(`Canvas: ${canvas.width} x ${canvas.height}`, canvas.width - 200, 12);
         ctx.beginPath();
         ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2);
         ctx.fillStyle = 'yellow';
