@@ -8,6 +8,83 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #1a1a2e; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; margin: 0 auto; cursor: crosshair; }
+
+        /* SPLASH OVERLAY */
+        #hooked-splash {
+            position: absolute; inset: 0; z-index: 100;
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px; box-sizing: border-box;
+            font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+            background: radial-gradient(120% 90% at 50% 40%, rgba(9, 46, 48, 0.42) 0%, rgba(3, 12, 14, 0.86) 100%);
+            backdrop-filter: blur(2px); animation: hk-fade 0.5s ease both;
+        }
+        #hooked-splash.hk-hidden { display: none; }
+        #hooked-splash::before, #hooked-splash::after {
+            content: ""; position: absolute; inset: -20%; pointer-events: none;
+            background-repeat: repeat; mix-blend-mode: screen; opacity: 0.6;
+        }
+        #hooked-splash::before {
+            background-image: repeating-linear-gradient(100deg, rgba(94,224,205,0) 0px, rgba(94,224,205,0.05) 90px, rgba(94,224,205,0) 210px);
+            animation: hk-drift-a 17s linear infinite;
+        }
+        #hooked-splash::after {
+            background-image: repeating-linear-gradient(-80deg, rgba(242,177,52,0) 0px, rgba(242,177,52,0.045) 60px, rgba(242,177,52,0) 320px);
+            animation: hk-drift-b 26s linear infinite;
+        }
+        .hk-ripples { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .hk-ripple {
+            position: absolute; top: 50%; left: 50%; width: 240px; height: 240px;
+            margin: -120px 0 0 -120px; border: 1px solid rgba(126,232,214,0.45);
+            border-radius: 50%; transform: scale(0.2); opacity: 0;
+            animation: hk-ripple 7s ease-out infinite;
+        }
+        .hk-ripple:nth-child(2) { animation-delay: 2.3s; }
+        .hk-ripple:nth-child(3) { animation-delay: 4.6s; }
+        .hk-panel {
+            position: relative; z-index: 1; width: min(560px, 100%);
+            box-sizing: border-box; padding: 28px 32px 26px;
+            display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center;
+            border-radius: 18px; border: 1px solid rgba(126,232,214,0.18);
+            background: linear-gradient(180deg, rgba(13,48,51,0.92) 0%, rgba(6,24,28,0.95) 100%);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 30px 70px -20px rgba(0,0,0,0.85), inset 0 1px 0 rgba(180,255,244,0.12);
+            animation: hk-rise 0.6s cubic-bezier(0.2,0.8,0.2,1) both;
+        }
+        .hk-title { margin: 0; width: 100%; display: flex; justify-content: center; }
+        .hk-logo { width: min(420px, 100%); height: auto; display: block; margin: 0 auto;
+            filter: drop-shadow(0 12px 22px rgba(0,0,0,0.6)); animation: hk-bob 6s ease-in-out infinite; }
+        .hk-form { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+        .hk-input {
+            width: 100%; box-sizing: border-box; padding: 14px 16px; font: inherit; font-size: 16px;
+            text-align: center; color: #eafcf7; border-radius: 10px;
+            border: 1px solid rgba(126,232,214,0.22); background: rgba(2,16,18,0.75);
+            outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .hk-input::placeholder { color: rgba(190,224,219,0.42); }
+        .hk-input:focus { border-color: rgba(242,177,52,0.6); box-shadow: 0 0 0 3px rgba(242,177,52,0.14); }
+        .hk-cast {
+            position: relative; width: 100%; padding: 17px 20px; font: inherit; font-size: 21px;
+            font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #fff3d8;
+            cursor: pointer; border: 1px solid #2b1a0d; border-radius: 12px;
+            text-shadow: 0 2px 3px rgba(0,0,0,0.6); background-color: #8a5220;
+            background-image: repeating-linear-gradient(92deg, rgba(0,0,0,0.16) 0 2px, rgba(0,0,0,0) 2px 9px),
+                repeating-linear-gradient(88deg, rgba(255,220,160,0.07) 0 1px, rgba(0,0,0,0) 1px 14px),
+                linear-gradient(180deg, #a9662a 0%, #86501f 55%, #603713 100%);
+            box-shadow: inset 0 1px 0 rgba(255,214,160,0.35), inset 0 -3px 0 rgba(0,0,0,0.35),
+                0 6px 0 #3f2410, 0 12px 24px -6px rgba(0,0,0,0.7);
+            transition: transform 0.08s, box-shadow 0.08s, filter 0.2s;
+        }
+        .hk-cast:hover { filter: brightness(1.08); }
+        .hk-cast:active { transform: translateY(5px);
+            box-shadow: inset 0 1px 0 rgba(255,214,160,0.25), inset 0 -2px 0 rgba(0,0,0,0.35),
+                0 1px 0 #3f2410, 0 6px 14px -6px rgba(0,0,0,0.7); }
+        .hk-hint { margin: 0; font-size: 12.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(184,217,212,0.62); }
+        .hk-hint b { color: #f2b134; font-weight: 700; }
+        @keyframes hk-fade { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes hk-rise { from { opacity: 0; transform: translateY(18px) scale(0.98) } to { opacity: 1; transform: none } }
+        @keyframes hk-bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+        @keyframes hk-ripple { 0% { transform: scale(0.15); opacity: 0 } 12% { opacity: 0.55 } 100% { transform: scale(4.2); opacity: 0 } }
+        @keyframes hk-drift-a { to { transform: translate3d(180px, 90px, 0) } }
+        @keyframes hk-drift-b { to { transform: translate3d(-200px, 70px, 0) } }
         #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         #ui button, #ui #shop-panel, #ui #boat-switcher, #ui #catch-panel { pointer-events: auto; }
         #status { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); 
@@ -66,6 +143,29 @@
 </head>
 <body>
     <canvas id="game"></canvas>
+    
+    <!-- SPLASH OVERLAY -->
+    <div id="hooked-splash" role="dialog" aria-modal="true">
+        <div class="hk-ripples" aria-hidden="true">
+            <span class="hk-ripple"></span>
+            <span class="hk-ripple"></span>
+            <span class="hk-ripple"></span>
+        </div>
+        <div class="hk-panel">
+            <h1 class="hk-title">
+                <img class="hk-logo" src="logo.png" alt="HOOKED" />
+            </h1>
+            <form class="hk-form" id="hk-form" autocomplete="off">
+                <input class="hk-input" id="hk-name" type="text" name="player"
+                       placeholder="Enter your name..." maxlength="16" aria-label="Player name" />
+                <button class="hk-cast" type="submit">Cast Off</button>
+            </form>
+            <p class="hk-hint">
+                <b>WASD</b> to drive &nbsp;•&nbsp; <b>Click</b> to cast &nbsp;•&nbsp; <b>B</b> for shop
+            </p>
+        </div>
+    </div>
+    
     <div id="ui">
         <div id="status">Loading...</div>
         <div id="stats">
@@ -139,9 +239,6 @@
             </label>
             <label style="display:block; margin:3px 0; cursor:pointer;">
                 <input type="checkbox" id="toggle-clouds" checked onchange="animToggles.clouds=this.checked"> Cloud Shadows
-            </label>
-            <label style="display:block; margin:3px 0; cursor:pointer;">
-                <input type="checkbox" id="toggle-fishJump" checked onchange="animToggles.fishJump=this.checked"> Fish Jumping
             </label>
             <label style="display:block; margin:3px 0; cursor:pointer;">
                 <input type="checkbox" id="toggle-fishShadow" checked onchange="animToggles.fishShadow=this.checked"> Fish Shadow

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HOOKED — Splash</title>
+<style>
+  /* ============================================================
+     DEMO SHELL — only here to show the overlay on top of a canvas.
+     In your game, keep the #hooked-splash block + the CSS below
+     the "SPLASH OVERLAY" comment, and drop it next to your canvas.
+     ============================================================ */
+  html, body { margin: 0; height: 100%; background: #04100f; }
+  #game { display: block; width: 100vw; height: 100vh; }
+  #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+  /* ==================== SPLASH OVERLAY ==================== */
+  #hooked-splash {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    /* semi-transparent dark scrim behind the panel */
+    background:
+      radial-gradient(120% 90% at 50% 40%, rgba(9, 46, 48, 0.42) 0%, rgba(3, 12, 14, 0.86) 100%);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    animation: hk-fade 0.5s ease both;
+  }
+  #hooked-splash.hk-hidden { display: none; }
+
+  /* shimmering water light bands drifting across the scrim */
+  #hooked-splash::before,
+  #hooked-splash::after {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    pointer-events: none;
+    background-repeat: repeat;
+    mix-blend-mode: screen;
+    opacity: 0.6;
+  }
+  #hooked-splash::before {
+    background-image: repeating-linear-gradient(
+      100deg,
+      rgba(94, 224, 205, 0) 0px,
+      rgba(94, 224, 205, 0.05) 90px,
+      rgba(94, 224, 205, 0) 210px
+    );
+    animation: hk-drift-a 17s linear infinite;
+  }
+  #hooked-splash::after {
+    background-image: repeating-linear-gradient(
+      -80deg,
+      rgba(242, 177, 52, 0) 0px,
+      rgba(242, 177, 52, 0.045) 60px,
+      rgba(242, 177, 52, 0) 320px
+    );
+    animation: hk-drift-b 26s linear infinite;
+  }
+
+  /* expanding ripple rings */
+  .hk-ripples { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .hk-ripple {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 240px;
+    height: 240px;
+    margin: -120px 0 0 -120px;
+    border: 1px solid rgba(126, 232, 214, 0.45);
+    border-radius: 50%;
+    transform: scale(0.2);
+    opacity: 0;
+    animation: hk-ripple 7s ease-out infinite;
+  }
+  .hk-ripple:nth-child(2) { animation-delay: 2.3s; }
+  .hk-ripple:nth-child(3) { animation-delay: 4.6s; }
+
+  /* ---- centered panel ---- */
+  .hk-panel {
+    position: relative;
+    z-index: 1;
+    width: min(560px, 100%);
+    box-sizing: border-box;
+    padding: 28px 32px 26px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    text-align: center;
+    border-radius: 18px;
+    border: 1px solid rgba(126, 232, 214, 0.18);
+    background:
+      linear-gradient(180deg, rgba(13, 48, 51, 0.92) 0%, rgba(6, 24, 28, 0.95) 100%);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.5),
+      0 30px 70px -20px rgba(0, 0, 0, 0.85),
+      inset 0 1px 0 rgba(180, 255, 244, 0.12);
+    animation: hk-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .hk-title {
+    margin: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  .hk-logo {
+    width: min(420px, 100%);
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.6));
+    animation: hk-bob 6s ease-in-out infinite;
+  }
+  .hk-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .hk-form { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+
+  .hk-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px 16px;
+    font: inherit;
+    font-size: 16px;
+    text-align: center;
+    color: #eafcf7;
+    border-radius: 10px;
+    border: 1px solid rgba(126, 232, 214, 0.22);
+    background: rgba(2, 16, 18, 0.75);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .hk-input::placeholder { color: rgba(190, 224, 219, 0.42); }
+  .hk-input:focus {
+    border-color: rgba(242, 177, 52, 0.6);
+    box-shadow: 0 0 0 3px rgba(242, 177, 52, 0.14);
+  }
+
+  /* ---- rustic wood button ---- */
+  .hk-cast {
+    position: relative;
+    width: 100%;
+    padding: 17px 20px;
+    font: inherit;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #fff3d8;
+    cursor: pointer;
+    border: 1px solid #2b1a0d;
+    border-radius: 12px;
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+    background-color: #8a5220;
+    background-image:
+      repeating-linear-gradient(92deg, rgba(0,0,0,0.16) 0 2px, rgba(0,0,0,0) 2px 9px),
+      repeating-linear-gradient(88deg, rgba(255, 220, 160, 0.07) 0 1px, rgba(0,0,0,0) 1px 14px),
+      linear-gradient(180deg, #a9662a 0%, #86501f 55%, #603713 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 214, 160, 0.35),
+      inset 0 -3px 0 rgba(0, 0, 0, 0.35),
+      0 6px 0 #3f2410,
+      0 12px 24px -6px rgba(0, 0, 0, 0.7);
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.2s;
+  }
+  .hk-cast:hover { filter: brightness(1.08); }
+  .hk-cast:active {
+    transform: translateY(5px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 214, 160, 0.25),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+      0 1px 0 #3f2410,
+      0 6px 14px -6px rgba(0, 0, 0, 0.7);
+  }
+  .hk-cast:focus-visible { outline: 3px solid rgba(242, 177, 52, 0.7); outline-offset: 3px; }
+
+  .hk-hint {
+    margin: 0;
+    font-size: 12.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(184, 217, 212, 0.62);
+  }
+  .hk-hint b { color: #f2b134; font-weight: 700; }
+
+  @keyframes hk-fade { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes hk-rise {
+    from { opacity: 0; transform: translateY(18px) scale(0.98) }
+    to { opacity: 1; transform: none }
+  }
+  @keyframes hk-bob {
+    0%, 100% { transform: translateY(0) }
+    50% { transform: translateY(-6px) }
+  }
+  @keyframes hk-ripple {
+    0% { transform: scale(0.15); opacity: 0 }
+    12% { opacity: 0.55 }
+    100% { transform: scale(4.2); opacity: 0 }
+  }
+  @keyframes hk-drift-a { to { transform: translate3d(180px, 90px, 0) } }
+  @keyframes hk-drift-b { to { transform: translate3d(-200px, 70px, 0) } }
+
+  @media (max-width: 520px) {
+    .hk-panel { padding: 22px 18px; gap: 18px; border-radius: 14px; }
+    .hk-cast { font-size: 18px; }
+    .hk-hint { font-size: 11px; letter-spacing: 0.08em; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #hooked-splash, #hooked-splash::before, #hooked-splash::after,
+    .hk-panel, .hk-logo, .hk-ripple { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <!-- your game canvas -->
+  <canvas id="game"></canvas>
+
+  <!-- ==================== SPLASH OVERLAY ==================== -->
+  <div id="hooked-splash" role="dialog" aria-modal="true" aria-labelledby="hk-title">
+    <div class="hk-ripples" aria-hidden="true">
+      <span class="hk-ripple"></span>
+      <span class="hk-ripple"></span>
+      <span class="hk-ripple"></span>
+    </div>
+
+    <div class="hk-panel">
+      <h1 id="hk-title" class="hk-title">
+        <span class="hk-sr">Hooked</span>
+        <img class="hk-logo" src="/hooked-logo.png" alt="" />
+      </h1>
+      <form class="hk-form" id="hk-form" autocomplete="off">
+        <input class="hk-input" id="hk-name" type="text" name="player"
+               placeholder="Enter your name..." maxlength="16" aria-label="Player name" />
+        <button class="hk-cast" type="submit">Cast Off</button>
+      </form>
+
+      <p class="hk-hint">
+        <b>WASD</b> to drive &nbsp;•&nbsp; <b>Click</b> to cast &nbsp;•&nbsp; <b>B</b> for shop
+      </p>
+    </div>
+  </div>
+  <!-- ================== /SPLASH OVERLAY ==================== -->
+</div>
+
+<script>
+  // --- splash wiring: swap startGame() for your own entry point ---
+  (function () {
+    var splash = document.getElementById('hooked-splash');
+    document.getElementById('hk-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = document.getElementById('hk-name').value.trim() || 'Angler';
+      splash.classList.add('hk-hidden');
+      if (window.startGame) window.startGame(name);
+      console.log('[v0] cast off as', name);
+    });
+  })();
+
+  // --- demo lake canvas so the overlay has something to sit on ---
+  (function () {
+    var c = document.getElementById('game'), x = c.getContext('2d'), t = 0;
+    function size() { c.width = innerWidth; c.height = innerHeight; }
+    addEventListener('resize', size); size();
+    (function loop() {
+      var g = x.createLinearGradient(0, 0, 0, c.height);
+      g.addColorStop(0, '#0a2b2e'); g.addColorStop(1, '#041214');
+      x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+      x.strokeStyle = 'rgba(120,220,205,0.09)'; x.lineWidth = 1;
+      for (var i = 0; i < 26; i++) {
+        var y = (i / 26) * c.height;
+        x.beginPath();
+        for (var px = 0; px <= c.width; px += 12) {
+          var oy = Math.sin(px * 0.008 + t * 0.02 + i) * 6 + Math.sin(px * 0.02 - t * 0.03) * 3;
+          px === 0 ? x.moveTo(px, y + oy) : x.lineTo(px, y + oy);
+        }
+        x.stroke();
+      }
+      t++; requestAnimationFrame(loop);
+    })();
+  })();
+</script>
+</body>
+</html>

@@ -29,7 +29,7 @@ const State = {
 };
 
 let gameState = State.LOADING;
-let animToggles = { depth: true, shoreline: true, bubbles: true, mist: true, castSplash: true, hookFlash: true, clouds: true, fishJump: true, fishShadow: true, timeOfDay: true, grid: false };
+let animToggles = { depth: true, shoreline: true, bubbles: true, mist: true, castSplash: true, hookFlash: true, clouds: true, fishShadow: true, timeOfDay: true, grid: false };
 let forceNight = false;
 let fastCycle = false;
 
@@ -484,6 +484,7 @@ function connectMultiplayer() {
                         p.bobberX = data.bobberX;
                         p.bobberY = data.bobberY;
                         p.bobberVisible = data.bobberVisible;
+                        p.name = data.name;
                     }
                     break;
                     
@@ -523,7 +524,8 @@ function sendPlayerState() {
         fishingState: gameState,
         bobberX: bobber.x,
         bobberY: bobber.y,
-        bobberVisible: bobber.visible
+        bobberVisible: bobber.visible,
+        name: playerName
     }));
 }
 
@@ -2417,7 +2419,6 @@ function update() {
     updateSplash();
     updateHookFlash();
     updateClouds();
-    updateFishJumps();
     updateFishShadow();
     updateFireflies();
     updateAchievementDisplay();
@@ -2632,9 +2633,6 @@ function render() {
     // Draw fish shadow during fight
     renderFishShadow();
     
-    // Draw fish jumps
-    renderFishJumps();
-    
     // Draw bubbles (behind boat)
     renderBubbles();
     
@@ -2741,7 +2739,10 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-function startGame() {
+let playerName = 'Angler';
+
+function startGame(name) {
+    if (name) playerName = name;
     findStartPosition();
     updateCamera();
     updateStatsUI();
@@ -2750,9 +2751,19 @@ function startGame() {
 
 function waitForLoad() {
     if (imagesLoaded >= totalImages) {
-        startGame();
+        // Don't auto-start — wait for splash screen
+        document.getElementById('ui').style.display = 'none';
     } else {
         requestAnimationFrame(waitForLoad);
     }
 }
 waitForLoad();
+
+// Splash screen handler
+document.getElementById('hk-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const name = document.getElementById('hk-name').value.trim() || 'Angler';
+    document.getElementById('hooked-splash').classList.add('hk-hidden');
+    document.getElementById('ui').style.display = '';
+    startGame(name);
+});
