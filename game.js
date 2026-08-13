@@ -1716,16 +1716,16 @@ cloudImgs[1].src = 'cloud2.png';
 cloudImgs[2].src = 'cloud3.png';
 
 function initClouds() {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
         cloudShadows.push({
-            x: canvas.width + Math.random() * 500, // Start off-screen
-            y: Math.random() * canvas.height * 0.7,
+            x: -300 + Math.random() * (canvas.width + 300),
+            y: -canvas.height * 0.4 + Math.random() * canvas.height * 1.3,
             scale: 0.3 + Math.random() * 0.3,
             speed: 0.15 + Math.random() * 0.15,
             alpha: 0.3,
             imgIndex: Math.floor(Math.random() * 3),
-            active: false,
-            cooldown: Math.random() * 600 // Random delay before first appearance
+            active: true,
+            cooldown: 0
         });
     }
 }
@@ -1738,7 +1738,7 @@ function updateClouds() {
             if (c.cooldown <= 0) {
                 c.active = true;
                 c.x = -300;
-                c.y = Math.random() * canvas.height * 0.7;
+                c.y = -canvas.height * 0.4 + Math.random() * canvas.height * 1.3;
                 c.scale = 0.3 + Math.random() * 0.3;
                 c.imgIndex = Math.floor(Math.random() * 3);
             }
@@ -1746,8 +1746,10 @@ function updateClouds() {
         }
         c.x += c.speed;
         if (c.x > canvas.width + 300) {
-            c.active = false;
-            c.cooldown = 120 + Math.random() * 300; // 2-7 minutes before next pass
+            c.x = -300;
+            c.y = -canvas.height * 0.4 + Math.random() * canvas.height * 1.3;
+            c.scale = 0.3 + Math.random() * 0.3;
+            c.imgIndex = Math.floor(Math.random() * 3);
         }
     }
 }
