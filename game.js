@@ -503,7 +503,7 @@ function updateAudio() {
 // ============================================
 // MULTIPLAYER
 // ============================================
-const PARTYKIT_HOST = "localhost:8081"; // Local dev — change to production URL after deploy
+const PARTYKIT_HOST = "hooked-5kn3.onrender.com"; // Production WebSocket server
 let socket = null;
 let myPlayerId = null;
 let otherPlayers = {};
