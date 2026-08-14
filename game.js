@@ -274,7 +274,8 @@ function renderTimeTint() {
     // Boat lantern at night
     if (isNight()) {
         // Headlight cone in front of boat
-        const lightDist = 150;
+        const lightScale = canvas.width / 1536;
+        const lightDist = 150 * lightScale;
         const lightSpread = 0.5; // radians, cone width
         const frontX = boat.x + Math.sin(boat.angle) * lightDist;
         const frontY = boat.y - Math.cos(boat.angle) * lightDist;
@@ -287,7 +288,7 @@ function renderTimeTint() {
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(boat.x, boat.y);
-        ctx.arc(boat.x, boat.y, lightDist, -boat.angle - Math.PI/2 - lightSpread, -boat.angle - Math.PI/2 + lightSpread);
+        ctx.arc(boat.x, boat.y, lightDist, boat.angle - Math.PI/2 - lightSpread, boat.angle - Math.PI/2 + lightSpread);
         ctx.closePath();
         ctx.fillStyle = gradient;
         ctx.fill();
@@ -421,9 +422,11 @@ function updateAudio() {
         audio.nightAmbient.volume = Math.max(0, audio.nightAmbient.volume - 0.003);
     }
     
-    // Boat sound — volume based on speed
-    const speedRatio = Math.abs(boat.speed) / equippedBoat.maxSpeed;
-    audio.boat.volume = Math.min(0.25, speedRatio * 0.3);
+    // Boat sound — volume based on speed (scaled)
+    const boatScreenScale = canvas.width / 1536;
+    const scaledMax = equippedBoat.maxSpeed * boatScreenScale;
+    const speedRatio = Math.abs(boat.speed) / scaledMax;
+    audio.boat.volume = speedRatio > 0.05 ? Math.min(0.25, speedRatio * 0.3) : 0;
     
     // Waterfall — distance-based volume
     const waterfallX = canvas.width * 0.2705;
@@ -2408,6 +2411,7 @@ function equipBait(baitId) {
     if (baitId !== 'none' && (baitInventory[baitId] || 0) <= 0) return;
     equippedBait = b;
     renderShop();
+    saveGame();
 }
 
 function cycleBoat() {
@@ -2474,11 +2478,12 @@ function startCast() {
         return;
     }
     
-    // Check cast range
+    // Check cast range (scaled to screen size)
     const dx = targetX - boat.x;
     const dy = targetY - boat.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxRange = equippedRod.castRange;
+    const screenScale = canvas.width / 1536;
+    const maxRange = equippedRod.castRange * screenScale;
     
     let castX, castY;
     if (dist > maxRange) {
@@ -2506,17 +2511,17 @@ function startCast() {
     
     // Bite time based on depth and gear match
     const depth = getDepthAtPosition(castX, castY);
-    const gearTier = Math.min(equippedRod.tier, equippedReel.tier, equippedLine.tier);
+    const avgGearTier = (equippedRod.tier + equippedReel.tier + equippedLine.tier) / 3;
     
     let baseWait;
     if (depth === 'shallow') baseWait = 2 + Math.random() * 2;
     else if (depth === 'medium') baseWait = 4 + Math.random() * 5;
     else baseWait = 6 + Math.random() * 8;
     
-    // Wrong gear penalty
+    // Wrong gear penalty — based on average tier vs zone requirement
     const zoneMinTier = depth === 'shallow' ? 1 : (depth === 'medium' ? 2 : 3);
-    if (gearTier < zoneMinTier) {
-        baseWait *= 1.5 + (zoneMinTier - gearTier) * 0.5;
+    if (avgGearTier < zoneMinTier) {
+        baseWait *= 1.3 + (zoneMinTier - avgGearTier) * 0.4;
     }
     
     // Bait reduction
@@ -2857,10 +2862,13 @@ function updateBoat() {
     if (keys['a'] || keys['arrowleft']) boat.angle -= boat.turnSpeed;
     if (keys['d'] || keys['arrowright']) boat.angle += boat.turnSpeed;
     
+    const screenScale = canvas.width / 1536;
+    const scaledMaxSpeed = equippedBoat.maxSpeed * screenScale;
+    
     if (keys['w'] || keys['arrowup']) {
-        boat.speed = Math.min(boat.speed + boat.acceleration, equippedBoat.maxSpeed);
+        boat.speed = Math.min(boat.speed + boat.acceleration, scaledMaxSpeed);
     } else if (keys['s'] || keys['arrowdown']) {
-        boat.speed = Math.max(boat.speed - boat.acceleration, -equippedBoat.maxSpeed * 0.4);
+        boat.speed = Math.max(boat.speed - boat.acceleration, -scaledMaxSpeed * 0.4);
     } else {
         boat.speed *= boat.friction;
     }
@@ -2916,8 +2924,9 @@ function render() {
     
     // Draw cast range indicator when driving
     if (gameState === State.DRIVING && !shopOpen) {
+        const screenScale = canvas.width / 1536;
         ctx.beginPath();
-        ctx.arc(boat.x, boat.y, equippedRod.castRange, 0, Math.PI * 2);
+        ctx.arc(boat.x, boat.y, equippedRod.castRange * screenScale, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 1;
         ctx.setLineDash([5, 5]);
@@ -3130,6 +3139,7 @@ function loadGame() {
         inventory = data.inventory || [];
         ownedGear = data.ownedGear || ['bamboo_rod', 'basic_reel', 'mono_6lb'];
         baitInventory = data.baitInventory || { none: Infinity, worm: 0, minnow: 0, leech: 0, crayfish: 0, golden_shiner: 0 };
+        baitInventory.none = Infinity; // Fix: Infinity can't survive JSON serialization
         fishJournal = data.fishJournal || {};
         achievements = data.achievements || [];
         playerName = data.playerName || 'Angler';
@@ -3152,12 +3162,9 @@ function loadGame() {
 }
 
 function startGame(name) {
-    if (name) playerName = name;
     loadGame();
-    // Pre-fill name input if we have a saved name
-    if (playerName !== 'Angler') {
-        document.getElementById('hk-name').value = playerName;
-    }
+    // Name from splash screen takes priority over saved name
+    if (name) playerName = name;
     findStartPosition();
     updateCamera();
     updateStatsUI();
