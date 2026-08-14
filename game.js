@@ -29,7 +29,7 @@ const State = {
 };
 
 let gameState = State.LOADING;
-let animToggles = { depth: true, shoreline: true, bubbles: true, mist: true, castSplash: true, hookFlash: true, clouds: true, fishShadow: true, timeOfDay: true, grid: false };
+let animToggles = { depth: true, shoreline: true, bubbles: true, mist: true, castSplash: true, hookFlash: true, clouds: true, fishShadow: true, lilyPads: true, timeOfDay: true, grid: false };
 let forceNight = false;
 let fastCycle = false;
 
@@ -273,18 +273,37 @@ function renderTimeTint() {
     
     // Boat lantern at night
     if (isNight()) {
-        // Cut out a circle of light around the boat
-        const gradient = ctx.createRadialGradient(boat.x, boat.y, 0, boat.x, boat.y, 120);
-        gradient.addColorStop(0, 'rgba(255, 220, 150, 0.15)');
-        gradient.addColorStop(0.5, 'rgba(255, 200, 100, 0.05)');
+        // Headlight cone in front of boat
+        const lightDist = 150;
+        const lightSpread = 0.5; // radians, cone width
+        const frontX = boat.x + Math.sin(boat.angle) * lightDist;
+        const frontY = boat.y - Math.cos(boat.angle) * lightDist;
+        
+        const gradient = ctx.createRadialGradient(boat.x, boat.y, 10, frontX, frontY, lightDist);
+        gradient.addColorStop(0, 'rgba(255, 220, 150, 0.2)');
+        gradient.addColorStop(0.6, 'rgba(255, 200, 100, 0.08)');
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(boat.x, boat.y);
+        ctx.arc(boat.x, boat.y, lightDist, -boat.angle - Math.PI/2 - lightSpread, -boat.angle - Math.PI/2 + lightSpread);
+        ctx.closePath();
         ctx.fillStyle = gradient;
-        ctx.fillRect(boat.x - 120, boat.y - 120, 240, 240);
+        ctx.fill();
+        ctx.restore();
+        
+        // Soft glow around boat too
+        const boatGlow = ctx.createRadialGradient(boat.x, boat.y, 0, boat.x, boat.y, 60);
+        boatGlow.addColorStop(0, 'rgba(255, 220, 150, 0.1)');
+        boatGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = boatGlow;
+        ctx.fillRect(boat.x - 60, boat.y - 60, 120, 120);
         
         // Darken everything outside the lantern radius
         ctx.save();
         ctx.globalCompositeOperation = 'source-over';
-        const darkGradient = ctx.createRadialGradient(boat.x, boat.y, 60, boat.x, boat.y, 200);
+        const darkGradient = ctx.createRadialGradient(boat.x, boat.y, 80, boat.x, boat.y, 250);
         darkGradient.addColorStop(0, 'rgba(0, 0, 20, 0)');
         darkGradient.addColorStop(1, 'rgba(0, 0, 20, 0.3)');
         ctx.fillStyle = darkGradient;
@@ -326,6 +345,8 @@ const audio = {
     boat: new Audio('audio/freesound_community-boat-on-river-26388.mp3'),
     crow: new Audio('audio/kave_msri-crow-sfx-318131.mp3'),
     owl: new Audio('audio/lazychillzone-owl-hooting-223549.mp3'),
+    frog: new Audio('audio/dragon-studio-frog-croaking-sound-effect-322956.mp3'),
+    duck: new Audio('audio/wings_of_freedom-duck-sound-398808.mp3'),
     waterfall: new Audio('audio/freesound_community-waterfall-24060.mp3'),
     bite: new Audio('audio/47313572-notification-alert-269289.mp3'),
     loon: new Audio('audio/dragon-studio-loon-call-335487.mp3'),
@@ -350,6 +371,8 @@ audio.snap.volume = 0.5;
 audio.coin.volume = 0.4;
 audio.crow.volume = 0.3;
 audio.owl.volume = 0.3;
+audio.frog.volume = 0.4;
+audio.duck.volume = 0.35;
 audio.waterfall.loop = true;
 audio.waterfall.volume = 0;
 audio.bite.volume = 0.5;
@@ -386,7 +409,7 @@ function updateAudio() {
     if (isNight()) {
         audio.ambient.volume = Math.max(0, audio.ambient.volume - 0.003);
         // Frogs louder near lily pad area
-        const lilyX = canvas.width * (460 / 2322);
+        const lilyX = canvas.width * (485 / 2322);
         const lilyY = canvas.height * (844 / 1155);
         const lilyDx = boat.x - lilyX;
         const lilyDy = boat.y - lilyY;
@@ -460,6 +483,19 @@ function updateAudio() {
         if (!audio.owl._lastPlayed || Date.now() - audio.owl._lastPlayed > 120000) {
             audio.owl._lastPlayed = Date.now();
             playSound(audio.owl);
+        }
+    }
+    
+    // Frog croak — near lily pads, cooldown 30-60 seconds
+    const frogX = canvas.width * (460 / 2322);
+    const frogY = canvas.height * (844 / 1155);
+    const frogDx = boat.x - frogX;
+    const frogDy = boat.y - frogY;
+    const frogDist = Math.sqrt(frogDx * frogDx + frogDy * frogDy);
+    if (frogDist < 200 && Math.random() < 0.002) {
+        if (!audio.frog._lastPlayed || Date.now() - audio.frog._lastPlayed > 30000) {
+            audio.frog._lastPlayed = Date.now();
+            playSound(audio.frog);
         }
     }
 }
@@ -1487,6 +1523,58 @@ function renderMist() {
 }
 
 // ============================================
+// AMBIENT RIPPLE RINGS
+// ============================================
+let ambientRipples = [];
+let rippleTimer = 7; // Start near trigger so first one appears quickly
+
+function updateAmbientRipples() {
+    rippleTimer += 1/60;
+    
+    // Spawn a ripple every 5-10 seconds
+    if (rippleTimer > 5 + Math.random() * 5) {
+        rippleTimer = 0;
+        const rx = 150 + Math.random() * (canvas.width - 300);
+        const ry = 100 + Math.random() * (canvas.height - 200);
+        ambientRipples.push({
+            x: rx, y: ry,
+            size: 0,
+            maxSize: 20 + Math.random() * 20,
+            alpha: 0.5,
+            speed: 15 + Math.random() * 10
+        });
+    }
+    
+    // Update existing ripples
+    for (let i = ambientRipples.length - 1; i >= 0; i--) {
+        const r = ambientRipples[i];
+        r.size += r.speed * (1/60);
+        r.alpha = 0.4 * (1 - r.size / r.maxSize);
+        if (r.size >= r.maxSize) {
+            ambientRipples.splice(i, 1);
+        }
+    }
+}
+
+function renderAmbientRipples() {
+    for (const r of ambientRipples) {
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.size, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(200, 230, 255, ${r.alpha})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Second ring slightly behind
+        if (r.size > 5) {
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, r.size * 0.6, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(200, 230, 255, ${r.alpha * 0.5})`;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+        }
+    }
+}
+
+// ============================================
 // CAST SPLASH PARTICLES
 // ============================================
 let splashParticles = [];
@@ -1815,6 +1903,83 @@ function renderClouds() {
 }
 
 // ============================================
+// CATTAILS
+// ============================================
+let cattails = [];
+
+function initCattails() {
+    const centerX = canvas.width * (395 / 2322);
+    const centerY = canvas.height * (900 / 1155);
+    
+    for (let i = 0; i < 40; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * 45;
+        cattails.push({
+            x: centerX + Math.cos(angle) * dist,
+            y: centerY + Math.sin(angle) * dist * 0.5, // flatter spread along shore
+            height: 14 + Math.random() * 10,
+            swayPhase: Math.random() * Math.PI * 2,
+            swaySpeed: 0.6 + Math.random() * 0.4,
+            swayAmount: 1.5 + Math.random() * 1.5,
+            headSize: 2.5 + Math.random() * 1.5,
+            headLength: 5 + Math.random() * 3,
+            leafCount: Math.floor(1 + Math.random() * 2)
+        });
+    }
+}
+
+function renderCattails() {
+    for (const c of cattails) {
+        const sway = Math.sin(waterTime * c.swaySpeed + c.swayPhase) * c.swayAmount;
+        
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        
+        // Stalk
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(sway * 0.5, -c.height * 0.5, sway, -c.height);
+        ctx.strokeStyle = 'rgba(60, 90, 40, 0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        
+        // Leaves
+        for (let l = 0; l < c.leafCount; l++) {
+            const leafY = -c.height * (0.3 + l * 0.25);
+            const leafSway = sway * (0.3 + l * 0.2);
+            const leafDir = l % 2 === 0 ? 1 : -1;
+            ctx.beginPath();
+            ctx.moveTo(leafSway * 0.5, leafY);
+            ctx.quadraticCurveTo(
+                leafSway * 0.5 + leafDir * 8, leafY - 4,
+                leafSway * 0.5 + leafDir * 12, leafY + 2
+            );
+            ctx.strokeStyle = 'rgba(50, 80, 35, 0.7)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        
+        // Seed head (brown oval at top)
+        const headX = sway;
+        const headY = -c.height;
+        ctx.beginPath();
+        ctx.ellipse(headX, headY - c.headLength / 2, c.headSize * 0.6, c.headLength / 2, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(90, 55, 25, 0.9)';
+        ctx.fill();
+        
+        // Tiny spike at very top
+        ctx.beginPath();
+        ctx.moveTo(headX, headY - c.headLength);
+        ctx.lineTo(headX + sway * 0.1, headY - c.headLength - 3);
+        ctx.strokeStyle = 'rgba(70, 90, 40, 0.6)';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+}
+
+// ============================================
 // LILY PADS
 // ============================================
 let lilyPads = [];
@@ -1823,7 +1988,7 @@ lilyPadImgs[0].src = 'lillypad1.png';
 lilyPadImgs[1].src = 'lillypad2.png';
 
 function initLilyPads() {
-    const centerX = canvas.width * (460 / 2322);
+    const centerX = canvas.width * (485 / 2322);
     const centerY = canvas.height * (844 / 1155);
     
     // Main cluster
@@ -1838,12 +2003,12 @@ function initLilyPads() {
             bobPhase: Math.random() * Math.PI * 2,
             bobSpeed: 0.8 + Math.random() * 0.6,
             hasFlower: Math.random() < 0.3,
-            imgIndex: Math.floor(Math.random() * 2)
+            imgIndex: Math.random() < 0.2 ? 1 : 0
         });
     }
     
     // Cluster to the right
-    const rightX = canvas.width * (580 / 2322);
+    const rightX = canvas.width * (605 / 2322);
     const rightY = canvas.height * (874 / 1155);
     for (let i = 0; i < 11; i++) {
         const angle = Math.random() * Math.PI * 2;
@@ -1856,12 +2021,12 @@ function initLilyPads() {
             bobPhase: Math.random() * Math.PI * 2,
             bobSpeed: 0.8 + Math.random() * 0.6,
             hasFlower: Math.random() < 0.25,
-            imgIndex: Math.floor(Math.random() * 2)
+            imgIndex: Math.random() < 0.2 ? 1 : 0
         });
     }
     
     // Cluster below
-    const belowX = canvas.width * (490 / 2322);
+    const belowX = canvas.width * (515 / 2322);
     const belowY = canvas.height * (924 / 1155);
     for (let i = 0; i < 9; i++) {
         const angle = Math.random() * Math.PI * 2;
@@ -1874,12 +2039,31 @@ function initLilyPads() {
             bobPhase: Math.random() * Math.PI * 2,
             bobSpeed: 0.8 + Math.random() * 0.6,
             hasFlower: Math.random() < 0.2,
-            imgIndex: Math.floor(Math.random() * 2)
+            imgIndex: Math.random() < 0.2 ? 1 : 0
+        });
+    }
+    
+    // Cluster at 555, 839
+    const extraX = canvas.width * (555 / 2322);
+    const extraY = canvas.height * (839 / 1155);
+    for (let i = 0; i < 8; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 5 + Math.random() * 35;
+        lilyPads.push({
+            x: extraX + Math.cos(angle) * dist,
+            y: extraY + Math.sin(angle) * dist,
+            size: 5 + Math.random() * 5,
+            rotation: Math.random() * Math.PI * 2,
+            bobPhase: Math.random() * Math.PI * 2,
+            bobSpeed: 0.8 + Math.random() * 0.6,
+            hasFlower: Math.random() < 0.2,
+            imgIndex: Math.random() < 0.2 ? 1 : 0
         });
     }
 }
 
 function renderLilyPads() {
+    if (!animToggles.lilyPads) return;
     for (const pad of lilyPads) {
         const bob = Math.sin(waterTime * pad.bobSpeed + pad.bobPhase) * 1.2;
         const img = lilyPadImgs[pad.imgIndex];
@@ -1888,6 +2072,7 @@ function renderLilyPads() {
         ctx.save();
         ctx.translate(pad.x, pad.y + bob);
         ctx.rotate(pad.rotation);
+        ctx.globalAlpha = 0.7;
         const drawSize = pad.size * 2.5;
         ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
         ctx.restore();
@@ -2560,6 +2745,7 @@ function update() {
     updateClouds();
     updateFishShadow();
     updateFireflies();
+    updateAmbientRipples();
     updateAchievementDisplay();
     switch (gameState) {
         case State.DRIVING:
@@ -2761,6 +2947,9 @@ function render() {
     // Draw mist
     renderMist();
     
+    // Draw ambient ripples
+    renderAmbientRipples();
+    
     // Draw lily pads
     renderLilyPads();
     
@@ -2908,5 +3097,9 @@ document.getElementById('hk-form').addEventListener('submit', function(e) {
     const name = document.getElementById('hk-name').value.trim() || 'Angler';
     document.getElementById('hooked-splash').classList.add('hk-hidden');
     document.getElementById('ui').style.display = '';
+    // Clear any pending click so it doesn't auto-cast
+    mouse.clicked = false;
+    mouse.down = false;
+    setTimeout(() => { mouse.clicked = false; mouse.down = false; }, 100);
     startGame(name);
 });
