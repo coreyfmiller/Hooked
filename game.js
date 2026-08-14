@@ -1722,19 +1722,26 @@ function updateFishShadow() {
     
     fishDrag.changeTimer += 1 / 60;
     
+    // Move the origin toward the boat based on progress (reeling in)
+    const pullX = fishDrag.originX + (boat.x - fishDrag.originX) * progress;
+    const pullY = fishDrag.originY + (boat.y - fishDrag.originY) * progress;
+    
     // Pick a new target direction every 0.5-1.5 seconds
     if (fishDrag.changeTimer > 0.5 + Math.random() * 1.0) {
         fishDrag.changeTimer = 0;
         const maxDrag = currentCatch ? 15 + currentCatch.strength * 25 : 20;
         const angle = Math.random() * Math.PI * 2;
-        const dist = 5 + Math.random() * maxDrag;
-        const newX = fishDrag.originX + Math.cos(angle) * dist;
-        const newY = fishDrag.originY + Math.sin(angle) * dist;
+        const dist = 5 + Math.random() * maxDrag * (1 - progress * 0.7); // Less drag as you reel in
+        const newX = pullX + Math.cos(angle) * dist;
+        const newY = pullY + Math.sin(angle) * dist;
         
         // Only go there if it's water
         if (isWater(newX, newY)) {
             fishDrag.targetX = newX;
             fishDrag.targetY = newY;
+        } else {
+            fishDrag.targetX = pullX;
+            fishDrag.targetY = pullY;
         }
     }
     
