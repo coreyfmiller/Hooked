@@ -47,7 +47,7 @@ function toggleForceNight(enabled) {
 function toggleFastCycle(enabled) {
     fastCycle = enabled;
 }
-let gold = 0;
+let gold = 50;  // Start with 50 gold for first bait purchase
 let level = 1;
 let xp = 0;
 let xpToNext = 100;
@@ -690,19 +690,19 @@ let baitInventory = { none: Infinity, worm: 0, minnow: 0, leech: 0, crayfish: 0,
 const gearTiers = {
     rods: [
         { id: 'bamboo_rod', name: 'Bamboo Rod', price: 0, castRange: 80, tier: 1 },
-        { id: 'spinning_rod', name: 'Spinning Rod', price: 200, castRange: 140, tier: 2 },
+        { id: 'spinning_rod', name: 'Spinning Rod', price: 150, castRange: 140, tier: 2 },
         { id: 'baitcaster', name: 'Baitcaster', price: 500, castRange: 200, tier: 3 },
         { id: 'carbon_fiber', name: 'Carbon Fiber Rod', price: 1200, castRange: 260, tier: 4 }
     ],
     reels: [
         { id: 'basic_reel', name: 'Basic Reel', price: 0, reelSpeed: 0.20, tensionReduction: 0, tier: 1 },
-        { id: 'smooth_reel', name: 'Smooth Reel', price: 150, reelSpeed: 0.28, tensionReduction: 0.15, tier: 2 },
+        { id: 'smooth_reel', name: 'Smooth Reel', price: 100, reelSpeed: 0.28, tensionReduction: 0.15, tier: 2 },
         { id: 'pro_reel', name: 'Pro Reel', price: 400, reelSpeed: 0.35, tensionReduction: 0.25, tier: 3 },
         { id: 'tournament_reel', name: 'Tournament Reel', price: 900, reelSpeed: 0.42, tensionReduction: 0.35, tier: 4 }
     ],
     lines: [
         { id: 'mono_6lb', name: '6lb Mono', price: 0, maxTension: 0.85, tier: 1 },
-        { id: 'mono_10lb', name: '10lb Mono', price: 50, maxTension: 0.92, tier: 2 },
+        { id: 'mono_10lb', name: '10lb Mono', price: 40, maxTension: 0.92, tier: 2 },
         { id: 'braid_15lb', name: '15lb Braid', price: 150, maxTension: 0.96, tier: 3 },
         { id: 'braid_20lb', name: '20lb Braid', price: 300, maxTension: 1.0, tier: 4 }
     ]
@@ -905,8 +905,11 @@ function rollFish(castX, castY) {
     const weight = +(selected.minWeight + Math.random() * (selected.maxWeight - selected.minWeight)).toFixed(2);
     const length = +(selected.minLength + Math.random() * (selected.maxLength - selected.minLength)).toFixed(1);
     const sizeFactor = weight / selected.maxWeight;
-    const sellValue = Math.floor(selected.price * (0.7 + sizeFactor * 0.6));
-    return { ...selected, weight, length, sellValue };
+    let sellValue = Math.floor(selected.price * (0.7 + sizeFactor * 0.6));
+    // First-catch bonus: double gold on first specimen of each species
+    const isFirstCatch = !fishJournal[selected.id];
+    if (isFirstCatch) sellValue *= 2;
+    return { ...selected, weight, length, sellValue, isFirstCatch };
 }
 
 // ============================================
@@ -1015,9 +1018,9 @@ let boat = {
 
 // Boat tiers
 const boatTiers = [
-    { id: 'rowboat', name: 'Wooden Rowboat', price: 0, cargoHold: 5, maxSpeed: 1.2, sprite: 'woodenboat.png', tier: 1 },
-    { id: 'aluminum', name: 'Aluminum Boat', price: 400, cargoHold: 10, maxSpeed: 2.0, sprite: 'aluminumboat.png', tier: 2 },
-    { id: 'bass_boat', name: 'Bass Boat', price: 1200, cargoHold: 15, maxSpeed: 2.5, sprite: 'bassboat.png', tier: 3 }
+    { id: 'rowboat', name: 'Wooden Rowboat', price: 0, cargoHold: 8, maxSpeed: 1.2, sprite: 'woodenboat.png', tier: 1 },
+    { id: 'aluminum', name: 'Aluminum Boat', price: 400, cargoHold: 12, maxSpeed: 2.0, sprite: 'aluminumboat.png', tier: 2 },
+    { id: 'bass_boat', name: 'Bass Boat', price: 1200, cargoHold: 18, maxSpeed: 2.5, sprite: 'bassboat.png', tier: 3 }
 ];
 let equippedBoat = boatTiers[0];
 
@@ -2506,9 +2509,9 @@ function startCast() {
     const gearTier = Math.min(equippedRod.tier, equippedReel.tier, equippedLine.tier);
     
     let baseWait;
-    if (depth === 'shallow') baseWait = 3 + Math.random() * 5;
-    else if (depth === 'medium') baseWait = 5 + Math.random() * 8;
-    else baseWait = 8 + Math.random() * 12;
+    if (depth === 'shallow') baseWait = 2 + Math.random() * 2;
+    else if (depth === 'medium') baseWait = 4 + Math.random() * 5;
+    else baseWait = 6 + Math.random() * 8;
     
     // Wrong gear penalty
     const zoneMinTier = depth === 'shallow' ? 1 : (depth === 'medium' ? 2 : 3);
@@ -2586,7 +2589,7 @@ function landFish() {
     document.getElementById('catch-weight').textContent = `Weight: ${currentCatch.weight} kg`;
     document.getElementById('catch-length').textContent = `Length: ${currentCatch.length} cm`;
     document.getElementById('catch-xp').textContent = `+${currentCatch.xp} XP`;
-    document.getElementById('catch-value').textContent = `Value: ${currentCatch.sellValue} gold`;
+    document.getElementById('catch-value').textContent = `Value: ${currentCatch.sellValue} gold${currentCatch.isFirstCatch ? ' (2x NEW SPECIES!)' : ''}`;
     document.getElementById('catch-panel').style.display = 'block';
     // Hide sell button on water - can only sell at dock
     document.getElementById('sell-btn').style.display = 'none';
