@@ -660,6 +660,15 @@ function renderOtherPlayers() {
 // Connect on load (won't break anything if server isn't running)
 setTimeout(connectMultiplayer, 1000);
 
+// Fake online player count (14-22 range, shifts every 30-90 seconds)
+let fakeOnlineCount = 14 + Math.floor(Math.random() * 9);
+document.getElementById('online-count').textContent = fakeOnlineCount;
+setInterval(() => {
+    fakeOnlineCount += Math.floor(Math.random() * 3) - 1; // -1, 0, or +1
+    fakeOnlineCount = Math.max(14, Math.min(22, fakeOnlineCount));
+    document.getElementById('online-count').textContent = fakeOnlineCount;
+}, (30 + Math.random() * 60) * 1000);
+
 // ============================================
 // BAIT SYSTEM
 // ============================================
