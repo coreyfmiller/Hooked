@@ -2369,6 +2369,7 @@ function buyOrEquipBoat(boatId) {
     document.getElementById('current-boat-name').textContent = b.name;
     updateBoatRadios();
     renderShop();
+    saveGame();
 }
 
 function selectBoat(boatId) {
@@ -2395,6 +2396,7 @@ function buyBait(baitId) {
     playSound(audio.buy);
     updateStatsUI();
     renderShop();
+    saveGame();
 }
 
 function equipBait(baitId) {
@@ -2445,6 +2447,7 @@ function buyOrEquip(category, itemId) {
     else equippedLine = item;
     
     renderShop();
+    saveGame();
 }
 
 // ============================================
@@ -2624,6 +2627,7 @@ function keepFish() {
     setStatus(`Kept ${currentCatch.name}! (${inventory.length}/${equippedBoat.cargoHold}) Drive to dock to sell.`);
     updateStatsUI();
     checkAchievements();
+    saveGame();
 }
 
 function sellFromInventory(index) {
@@ -2636,6 +2640,7 @@ function sellFromInventory(index) {
     playSound(audio.coin);
     setStatus(`Sold ${fish.name} for ${fish.sellValue} gold!`);
     checkAchievements();
+    saveGame();
 }
 
 function sellAllFish() {
@@ -2648,6 +2653,7 @@ function sellAllFish() {
     playSound(audio.coin);
     setStatus(`Sold ${count} fish for ${totalValue} gold!`);
     checkAchievements();
+    saveGame();
 }
 
 function sellFish() {
@@ -2712,6 +2718,7 @@ function addXP(amount) {
         triggerAchievement(`⭐ Level ${level}!`);
     }
     updateStatsUI();
+    saveGame();
 }
 
 function updateStatsUI() {
@@ -3076,8 +3083,77 @@ function gameLoop() {
 
 let playerName = 'Angler';
 
+// ============================================
+// SAVE / LOAD (localStorage)
+// ============================================
+function saveGame() {
+    const saveData = {
+        gold,
+        level,
+        xp,
+        xpToNext,
+        fishCaught,
+        inventory,
+        ownedGear,
+        equippedRodId: equippedRod.id,
+        equippedReelId: equippedReel.id,
+        equippedLineId: equippedLine.id,
+        equippedBoatId: equippedBoat.id,
+        equippedBaitId: equippedBait.id,
+        baitInventory,
+        fishJournal,
+        achievements,
+        playerName
+    };
+    try {
+        localStorage.setItem('hooked_save', JSON.stringify(saveData));
+    } catch (e) {
+        console.warn('Save failed:', e);
+    }
+}
+
+function loadGame() {
+    try {
+        const raw = localStorage.getItem('hooked_save');
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        
+        gold = data.gold || 0;
+        level = data.level || 1;
+        xp = data.xp || 0;
+        xpToNext = data.xpToNext || 100;
+        fishCaught = data.fishCaught || 0;
+        inventory = data.inventory || [];
+        ownedGear = data.ownedGear || ['bamboo_rod', 'basic_reel', 'mono_6lb'];
+        baitInventory = data.baitInventory || { none: Infinity, worm: 0, minnow: 0, leech: 0, crayfish: 0, golden_shiner: 0 };
+        fishJournal = data.fishJournal || {};
+        achievements = data.achievements || [];
+        playerName = data.playerName || 'Angler';
+        
+        // Restore equipped gear by ID
+        if (data.equippedRodId) equippedRod = gearTiers.rods.find(r => r.id === data.equippedRodId) || gearTiers.rods[0];
+        if (data.equippedReelId) equippedReel = gearTiers.reels.find(r => r.id === data.equippedReelId) || gearTiers.reels[0];
+        if (data.equippedLineId) equippedLine = gearTiers.lines.find(r => r.id === data.equippedLineId) || gearTiers.lines[0];
+        if (data.equippedBoatId) {
+            equippedBoat = boatTiers.find(b => b.id === data.equippedBoatId) || boatTiers[0];
+            boatImg.src = equippedBoat.sprite;
+        }
+        if (data.equippedBaitId) equippedBait = baitTypes.find(b => b.id === data.equippedBaitId) || baitTypes[0];
+        
+        return true;
+    } catch (e) {
+        console.warn('Load failed:', e);
+        return false;
+    }
+}
+
 function startGame(name) {
     if (name) playerName = name;
+    loadGame();
+    // Pre-fill name input if we have a saved name
+    if (playerName !== 'Angler') {
+        document.getElementById('hk-name').value = playerName;
+    }
     findStartPosition();
     updateCamera();
     updateStatsUI();
@@ -3088,6 +3164,16 @@ function waitForLoad() {
     if (imagesLoaded >= totalImages) {
         // Don't auto-start — wait for splash screen
         document.getElementById('ui').style.display = 'none';
+        // Pre-fill name from save if available
+        try {
+            const raw = localStorage.getItem('hooked_save');
+            if (raw) {
+                const data = JSON.parse(raw);
+                if (data.playerName && data.playerName !== 'Angler') {
+                    document.getElementById('hk-name').value = data.playerName;
+                }
+            }
+        } catch(e) {}
     } else {
         requestAnimationFrame(waitForLoad);
     }
