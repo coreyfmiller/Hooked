@@ -29,7 +29,7 @@ const State = {
 };
 
 let gameState = State.LOADING;
-let animToggles = { depth: true, shoreline: true, bubbles: true, mist: true, castSplash: true, hookFlash: true, clouds: true, fishShadow: true, lilyPads: true, timeOfDay: true, grid: false };
+let animToggles = { depth: true, shoreline: true, bubbles: true, mist: true, castSplash: true, hookFlash: true, clouds: true, fishShadow: true, lilyPads: false, timeOfDay: true, grid: false };
 let forceNight = false;
 let fastCycle = false;
 
