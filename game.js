@@ -2879,6 +2879,7 @@ function updateBoat() {
     if (isAtDock(boat.x, boat.y)) {
         if (!boat.atDock) {
             boat.atDock = true;
+            currentShopTab = 'sell';
             if (!shopOpen) toggleShop();
             setStatus('');
         }
