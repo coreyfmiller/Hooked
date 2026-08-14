@@ -2182,164 +2182,159 @@ function toggleShop() {
     renderShop();
 }
 
+let currentShopTab = 'sell';
+
+function switchShopTab(tab) {
+    currentShopTab = tab;
+    document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.shop-tab').forEach(t => {
+        if (t.textContent.toLowerCase().includes(tab === 'sell' ? 'sell' : tab === 'bait' ? 'bait' : tab === 'gear' ? 'gear' : 'boat')) {
+            t.classList.add('active');
+        }
+    });
+    renderShop();
+}
+
 function renderShop() {
     const panel = document.getElementById('shop-items');
     panel.innerHTML = '';
+    document.getElementById('shop-gold-display').textContent = gold;
     
-    // Sell fish section
-    if (inventory.length > 0) {
-        const sellHeader = document.createElement('h3');
-        sellHeader.textContent = '🐟 Sell Fish';
-        sellHeader.style.color = '#ffd700';
-        sellHeader.style.marginBottom = '8px';
-        panel.appendChild(sellHeader);
-        
-        inventory.forEach((fish, index) => {
-            const div = document.createElement('div');
-            div.style.display = 'flex';
-            div.style.justifyContent = 'space-between';
-            div.style.alignItems = 'center';
-            div.style.padding = '4px 0';
-            div.style.borderBottom = '1px solid #333';
-            div.innerHTML = `
-                <span style="color:#ccc;">${fish.name} (${fish.weight}kg)</span>
-                <button onclick="sellFromInventory(${index})" 
-                    style="padding:4px 10px; background:#c49a20; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">
-                    Sell $${fish.sellValue}</button>
-            `;
-            panel.appendChild(div);
-        });
-        
-        // Sell all button
-        const sellAllDiv = document.createElement('div');
-        sellAllDiv.style.marginTop = '8px';
-        sellAllDiv.style.textAlign = 'center';
-        const totalValue = inventory.reduce((sum, f) => sum + f.sellValue, 0);
-        sellAllDiv.innerHTML = `
-            <button onclick="sellAllFish()" 
-                style="padding:6px 16px; background:#d4aa30; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:bold;">
-                Sell All ($${totalValue})</button>
-        `;
-        panel.appendChild(sellAllDiv);
-        
-        const spacer = document.createElement('hr');
-        spacer.style.border = '1px solid #333';
-        spacer.style.margin = '12px 0';
-        panel.appendChild(spacer);
+    switch (currentShopTab) {
+        case 'sell': renderShopSell(panel); break;
+        case 'bait': renderShopBait(panel); break;
+        case 'gear': renderShopGear(panel); break;
+        case 'boats': renderShopBoats(panel); break;
+    }
+}
+
+function renderShopSell(panel) {
+    if (inventory.length === 0) {
+        panel.innerHTML = '<div style="text-align:center; padding:40px 20px; color:rgba(180,210,210,0.5);"><p style="font-size:14px;">No fish to sell</p><p style="font-size:11px; margin-top:8px;">Go catch some!</p></div>';
+        return;
     }
     
-    // Boat upgrades section
-    const boatHeader = document.createElement('h3');
-    boatHeader.textContent = '🚤 Boats';
-    boatHeader.style.color = '#4cf';
-    boatHeader.style.marginTop = '12px';
-    panel.appendChild(boatHeader);
+    const totalValue = inventory.reduce((sum, f) => sum + f.sellValue, 0);
+    
+    // Sell all button at top
+    panel.innerHTML += `<button class="shop-sell-all" onclick="sellAllFish()">Sell All — 🪙 ${totalValue}</button>`;
+    panel.innerHTML += `<div style="font-size:11px; color:rgba(180,210,210,0.4); text-align:center; margin:8px 0 4px;">${inventory.length}/${equippedBoat.cargoHold} slots used</div>`;
+    
+    inventory.forEach((fish, index) => {
+        const imgSrc = fishImageMap[fish.id] || '';
+        panel.innerHTML += `
+            <div class="shop-sell-row">
+                ${imgSrc ? `<img src="${imgSrc}" style="width:32px; height:20px; object-fit:contain; margin-right:8px; opacity:0.9;">` : ''}
+                <span class="shop-sell-name">${fish.name} <span style="color:#888;">${fish.weight}kg</span></span>
+                <button class="shop-btn shop-btn-buy" onclick="sellFromInventory(${index})">🪙 ${fish.sellValue}</button>
+            </div>
+        `;
+    });
+}
 
-    // Bait section
-    const baitHeader = document.createElement('h3');
-    baitHeader.textContent = '🪱 Bait';
-    baitHeader.style.color = '#4cf';
-    baitHeader.style.marginTop = '12px';
-    panel.appendChild(baitHeader);
+function renderShopBait(panel) {
+    // Show currently equipped bait
+    const currentBait = equippedBait.id === 'none' ? 'None' : `${equippedBait.name} (${baitInventory[equippedBait.id] || 0} left)`;
+    panel.innerHTML += `<div style="font-size:11px; color:rgba(180,210,210,0.5); padding:6px 0; margin-bottom:4px;">Equipped: <span style="color:#ffd700;">${currentBait}</span></div>`;
     
     baitTypes.forEach(b => {
-        if (b.id === 'none') return; // No bait - always available, skip in shop
-        const div = document.createElement('div');
-        div.style.display = 'flex';
-        div.style.justifyContent = 'space-between';
-        div.style.alignItems = 'center';
-        div.style.padding = '4px 0';
-        div.style.borderBottom = '1px solid #333';
-        
+        if (b.id === 'none') return;
         const owned = baitInventory[b.id] || 0;
         const isEquipped = equippedBait.id === b.id;
         const canAfford = gold >= b.price;
         const reduction = Math.round((1 - b.biteMultiplier) * 100);
         
-        let rightSide = '';
-        if (owned > 0) {
-            rightSide = `<span style="color:#aaa; margin-right:8px;">(${owned})</span>`;
-            if (!isEquipped) {
-                rightSide += `<button onclick="equipBait('${b.id}')" style="padding:3px 8px; background:#2d8a4e; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">Use</button>`;
-            } else {
-                rightSide += `<span style="color:#4cf; font-size:11px;">✓ Active</span>`;
-            }
-        }
-        rightSide += ` <button onclick="buyBait('${b.id}')" style="padding:3px 8px; background:${canAfford ? '#c49a20' : '#555'}; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;" ${!canAfford ? 'disabled' : ''}>Buy x${b.quantity || 1} ($${b.price})</button>`;
-        
-        div.innerHTML = `
-            <span style="color:#ccc; font-size:12px;">${b.name} (-${reduction}% wait)</span>
-            <span>${rightSide}</span>
+        panel.innerHTML += `
+            <div class="shop-item ${isEquipped ? 'equipped' : ''}">
+                <div class="shop-item-info">
+                    <div class="shop-item-name">${b.name}</div>
+                    <div class="shop-item-stat">-${reduction}% bite wait ${owned > 0 ? `· <span style="color:#aaa;">${owned} remaining</span>` : ''}</div>
+                </div>
+                <div style="display:flex; gap:4px; align-items:center;">
+                    ${owned > 0 && !isEquipped ? `<button class="shop-btn shop-btn-equip" onclick="equipBait('${b.id}')">Use</button>` : ''}
+                    ${isEquipped ? `<span style="color:rgba(100,200,255,0.7); font-size:10px;">✓ Active</span>` : ''}
+                    <button class="shop-btn shop-btn-buy" onclick="buyBait('${b.id}')" ${!canAfford ? 'disabled' : ''}>x${b.quantity || 1} · 🪙${b.price}</button>
+                </div>
+            </div>
         `;
-        panel.appendChild(div);
     });
-    
-    const baitSpacer = document.createElement('hr');
-    baitSpacer.style.border = '1px solid #333';
-    baitSpacer.style.margin = '8px 0';
-    panel.appendChild(baitSpacer);
-    
-    boatTiers.forEach(b => {
-        const div = document.createElement('div');
-        div.style.display = 'flex';
-        div.style.justifyContent = 'space-between';
-        div.style.alignItems = 'center';
-        div.style.padding = '4px 0';
-        div.style.borderBottom = '1px solid #333';
-        
-        const isEquipped = b.id === equippedBoat.id;
-        const canAfford = gold >= b.price;
-        const owned = b.price === 0 || isEquipped || ownedGear.includes(b.id);
-        
-        let btnText = isEquipped ? '✓ Current' : (owned ? 'Use' : `Buy $${b.price}`);
-        let btnColor = isEquipped ? '#555' : (owned ? '#2d8a4e' : (canAfford ? '#c49a20' : '#555'));
-        
-        div.innerHTML = `
-            <span style="color: ${isEquipped ? '#4cf' : '#ccc'};">${b.name} (Hold: ${b.cargoHold})</span>
-            <button onclick="buyOrEquipBoat('${b.id}')" 
-                style="padding:4px 10px; background:${btnColor}; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
-                ${(!canAfford && !owned) ? 'disabled' : ''}>${btnText}</button>
-        `;
-        panel.appendChild(div);
-    });
-    
-    // Gear shop section
+}
+
+function renderShopGear(panel) {
     const categories = [
-        { name: 'Rods', items: gearTiers.rods, equipped: equippedRod },
-        { name: 'Reels', items: gearTiers.reels, equipped: equippedReel },
-        { name: 'Lines', items: gearTiers.lines, equipped: equippedLine }
+        { name: '🎣 Rods', key: 'rods', items: gearTiers.rods, equipped: equippedRod, statLabel: 'Range', statKey: 'castRange' },
+        { name: '🔄 Reels', key: 'reels', items: gearTiers.reels, equipped: equippedReel, statLabel: 'Speed', statKey: 'reelSpeed' },
+        { name: '🧵 Lines', key: 'lines', items: gearTiers.lines, equipped: equippedLine, statLabel: 'Strength', statKey: 'maxTension' }
     ];
     
     categories.forEach(cat => {
-        const header = document.createElement('h3');
-        header.textContent = cat.name;
-        header.style.color = '#4cf';
-        header.style.marginTop = '12px';
-        panel.appendChild(header);
+        panel.innerHTML += `<div style="font-size:12px; color:#4cf; font-weight:600; padding:10px 0 4px; border-bottom:1px solid rgba(100,200,200,0.1); margin-bottom:4px;">${cat.name}</div>`;
         
         cat.items.forEach(item => {
-            const div = document.createElement('div');
-            div.style.display = 'flex';
-            div.style.justifyContent = 'space-between';
-            div.style.alignItems = 'center';
-            div.style.padding = '4px 0';
-            div.style.borderBottom = '1px solid #333';
-            
             const isEquipped = item.id === cat.equipped.id;
             const canAfford = gold >= item.price;
             const owned = item.price === 0 || isEquipped || getOwnedGear().includes(item.id);
             
-            let btnText = isEquipped ? '✓ Equipped' : (owned ? 'Equip' : `Buy $${item.price}`);
-            let btnColor = isEquipped ? '#555' : (owned ? '#2d8a4e' : (canAfford ? '#c49a20' : '#555'));
+            // Stat comparison
+            let statCompare = '';
+            const currentVal = cat.equipped[cat.statKey];
+            const itemVal = item[cat.statKey];
+            if (!isEquipped && owned) {
+                const diff = itemVal - currentVal;
+                if (diff > 0) statCompare = `<span class="upgrade">▲ +${diff > 1 ? Math.round(diff) : diff.toFixed(2)}</span>`;
+                else if (diff < 0) statCompare = `<span style="color:#f66;">▼ ${diff > -1 ? diff.toFixed(2) : Math.round(diff)}</span>`;
+            }
             
-            div.innerHTML = `
-                <span style="color: ${isEquipped ? '#4cf' : '#ccc'};">${item.name} (Tier ${item.tier})</span>
-                <button onclick="buyOrEquip('${cat.name.toLowerCase()}', '${item.id}')" 
-                    style="padding:4px 10px; background:${btnColor}; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
-                    ${(!canAfford && !owned) ? 'disabled' : ''}>${btnText}</button>
+            let btnHtml;
+            if (isEquipped) btnHtml = `<button class="shop-btn shop-btn-equipped">✓ Equipped</button>`;
+            else if (owned) btnHtml = `<button class="shop-btn shop-btn-equip" onclick="buyOrEquip('${cat.key}', '${item.id}')">Equip</button>`;
+            else btnHtml = `<button class="shop-btn shop-btn-buy" onclick="buyOrEquip('${cat.key}', '${item.id}')" ${!canAfford ? 'disabled' : ''}>🪙 ${item.price}</button>`;
+            
+            panel.innerHTML += `
+                <div class="shop-item ${isEquipped ? 'equipped' : ''}">
+                    <div class="shop-item-info">
+                        <div class="shop-item-name">${item.name}</div>
+                        <div class="shop-item-stat">Tier ${item.tier} · ${cat.statLabel}: ${itemVal > 1 ? Math.round(itemVal) : itemVal.toFixed(2)} ${statCompare}</div>
+                    </div>
+                    ${btnHtml}
+                </div>
             `;
-            panel.appendChild(div);
         });
+    });
+}
+
+function renderShopBoats(panel) {
+    boatTiers.forEach(b => {
+        const isEquipped = b.id === equippedBoat.id;
+        const canAfford = gold >= b.price;
+        const owned = b.price === 0 || isEquipped || ownedGear.includes(b.id);
+        
+        // Stat comparison vs current
+        let speedCompare = '';
+        let cargoCompare = '';
+        if (!isEquipped) {
+            const speedDiff = b.maxSpeed - equippedBoat.maxSpeed;
+            const cargoDiff = b.cargoHold - equippedBoat.cargoHold;
+            if (speedDiff > 0) speedCompare = `<span class="upgrade">▲ +${speedDiff.toFixed(1)}</span>`;
+            else if (speedDiff < 0) speedCompare = `<span style="color:#f66;">▼ ${speedDiff.toFixed(1)}</span>`;
+            if (cargoDiff > 0) cargoCompare = `<span class="upgrade">▲ +${cargoDiff}</span>`;
+            else if (cargoDiff < 0) cargoCompare = `<span style="color:#f66;">▼ ${cargoDiff}</span>`;
+        }
+        
+        let btnHtml;
+        if (isEquipped) btnHtml = `<button class="shop-btn shop-btn-equipped">✓ Current</button>`;
+        else if (owned) btnHtml = `<button class="shop-btn shop-btn-equip" onclick="buyOrEquipBoat('${b.id}')">Use</button>`;
+        else btnHtml = `<button class="shop-btn shop-btn-buy" onclick="buyOrEquipBoat('${b.id}')" ${!canAfford ? 'disabled' : ''}>🪙 ${b.price}</button>`;
+        
+        panel.innerHTML += `
+            <div class="shop-item ${isEquipped ? 'equipped' : ''}">
+                <div class="shop-item-info">
+                    <div class="shop-item-name">${b.name}</div>
+                    <div class="shop-item-stat">Hold: ${b.cargoHold} ${cargoCompare} · Speed: ${b.maxSpeed} ${speedCompare}</div>
+                </div>
+                ${btnHtml}
+            </div>
+        `;
     });
 }
 
@@ -2865,13 +2860,12 @@ function updateBoat() {
     if (isAtDock(boat.x, boat.y)) {
         if (!boat.atDock) {
             boat.atDock = true;
-            document.getElementById('dock-prompt').style.display = 'block';
+            if (!shopOpen) toggleShop();
             setStatus('');
         }
     } else {
         if (boat.atDock) {
             boat.atDock = false;
-            document.getElementById('dock-prompt').style.display = 'none';
             if (shopOpen) toggleShop();
             setStatus('WASD to drive. Click to cast.');
         }
